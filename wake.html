@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>ALEX // Tactical Wake-Up Protocol</title>
+  <style>
+    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+    body {
+      margin: 0;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      background: radial-gradient(circle at center, #020b18 0%, #000205 100%);
+      color: #38bdf8;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+      padding: 10px;
+      overflow: hidden;
+    }
+
+    /* Holographic Scanlines & Stark HUD Frame */
+    body::before {
+      content: " ";
+      display: block;
+      position: absolute;
+      top: 0; left: 0; bottom: 0; right: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.3) 50%);
+      background-size: 100% 4px;
+      z-index: 10;
+      pointer-events: none;
+      opacity: 0.5;
+    }
+
+    /* Corner Brackets for Iron Man HUD Aesthetic */
+    .hud-frame {
+      position: absolute;
+      top: 5px; left: 5px; right: 5px; bottom: 5px;
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      pointer-events: none;
+      z-index: 9;
+    }
+    .hud-frame::before, .hud-frame::after {
+      content: "";
+      position: absolute;
+      width: 15px; height: 15px;
+      border-color: #38bdf8;
+      border-style: solid;
+    }
+    .hud-frame::before { top: 0; left: 0; border-width: 2px 0 0 2px; }
+    .hud-frame::after { top: 0; right: 0; border-width: 2px 2px 0 0; }
+
+    .hud-header {
+      position: relative;
+      z-index: 11;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      border-bottom: 2px solid rgba(56, 189, 248, 0.4);
+      padding: 4px 8px;
+      font-size: 0.6rem;
+      letter-spacing: 2px;
+      color: rgba(56, 189, 248, 0.7);
+      text-transform: uppercase;
+    }
+    .hud-header div:nth-child(2) { text-align: center; font-weight: bold; font-size: 0.75rem; color: #fff; text-shadow: 0 0 8px #38bdf8; }
+    .hud-header div:nth-child(3) { text-align: right; color: #00ffcc; }
+
+    .dashboard {
+      position: relative;
+      z-index: 11;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-around;
+      flex: 1;
+      width: 100%;
+      padding: 4px 0;
+    }
+
+    .center-stage {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ai-name {
+      font-size: 1.4rem;
+      font-weight: 900;
+      letter-spacing: 6px;
+      color: #38bdf8;
+      text-shadow: 0 0 12px rgba(56, 189, 248, 0.9);
+      margin-bottom: 1px;
+    }
+
+    .sub-title {
+      font-size: 0.55rem;
+      letter-spacing: 3px;
+      color: rgba(56, 189, 248, 0.6);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
+
+    .hold-container {
+      position: relative;
+      width: 135px;
+      height: 135px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    svg {
+      position: absolute;
+      top: 0; left: 0;
+      transform: rotate(-90deg);
+      filter: drop-shadow(0 0 8px rgba(0, 255, 204, 0.6));
+    }
+
+    circle {
+      fill: none;
+      stroke-width: 3.5;
+    }
+
+    .bg-ring { stroke: rgba(56, 189, 248, 0.15); }
+    .progress-ring {
+      stroke: #00ffcc;
+      stroke-dasharray: 376.99;
+      stroke-dashoffset: 376.99;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.05s linear;
+      filter: drop-shadow(0 0 6px #00ffcc);
+    }
+
+    #holdBtn {
+      width: 105px;
+      height: 105px;
+      border-radius: 50%;
+      border: 2px solid rgba(56, 189, 248, 0.6);
+      background: radial-gradient(circle, rgba(6,25,50,0.95) 0%, rgba(2,10,20,0.98) 100%);
+      color: #38bdf8;
+      font-size: 0.6rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      cursor: pointer;
+      box-shadow: inset 0 0 15px rgba(56, 189, 248, 0.3), 0 0 20px rgba(56, 189, 248, 0.2);
+      z-index: 2;
+      transition: all 0.2s ease;
+      text-shadow: 0 0 6px rgba(56, 189, 248, 0.8);
+    }
+
+    #holdBtn:active {
+      background: rgba(56, 189, 248, 0.25);
+      color: #00ffcc;
+    }
+
+    /* Screen-Filling Non-Blocking Schedule Drawer */
+    .schedule-panel {
+      width: 100%;
+      max-height: 120px;
+      background: rgba(4, 16, 32, 0.92);
+      border: 1px solid rgba(0, 255, 204, 0.4);
+      border-radius: 3px;
+      padding: 6px 10px;
+      overflow-y: auto;
+      text-align: left;
+      box-shadow: inset 0 0 15px rgba(0, 255, 204, 0.1);
+    }
+
+    .schedule-header {
+      font-size: 0.55rem;
+      color: #00ffcc;
+      font-weight: bold;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+      border-bottom: 1px solid rgba(0, 255, 204, 0.25);
+      padding-bottom: 2px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    #eventList {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .event-item {
+      font-size: 0.6rem;
+      margin-bottom: 3px;
+      display: flex;
+      justify-content: space-between;
+      color: #e2e8f0;
+      border-left: 2px solid #00ffcc;
+      padding-left: 6px;
+      background: rgba(56, 189, 248, 0.05);
+    }
+
+    .event-time {
+      color: #00ffcc;
+      font-weight: bold;
+    }
+
+    .hud-footer {
+      position: relative;
+      z-index: 11;
+      border-top: 2px solid rgba(56, 189, 248, 0.4);
+      padding: 6px 8px;
+      min-height: 38px;
+      font-size: 0.6rem;
+      color: #00ffcc;
+      letter-spacing: 1px;
+      text-align: center;
+      text-shadow: 0 0 6px rgba(0, 255, 204, 0.4);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="hud-frame"></div>
+
+  <div class="hud-header">
+    <div id="date-box">TUE // NOV 17</div>
+    <div id="time-box">06:30</div>
+    <div id="leave-badge">LEAVE: 7:30</div>
+  </div>
+
+  <div class="dashboard">
+    <div class="center-stage">
+      <div class="ai-name">ALEX</div>
+      <div class="sub-title" id="sub-protocol">STARK PROTOCOL // WEEK B</div>
+
+      <div class="hold-container">
+        <svg width="135" height="135">
+          <circle class="bg-ring" cx="67.5" cy="67.5" r="60"></circle>
+          <circle class="progress-ring" id="ring" cx="67.5" cy="67.5" r="60"></circle>
+        </svg>
+        <button id="holdBtn">HOLD 3S</button>
+      </div>
+    </div>
+
+    <!-- Non-blocking inline schedule drawer -->
+    <div class="schedule-panel">
+      <div class="schedule-header">
+        <span id="sched-title">TODAY'S TIMETABLE [WEEK B]</span>
+        <span>SYS.OK</span>
+      </div>
+      <ul id="eventList"></ul>
+    </div>
+  </div>
+
+  <div class="hud-footer" id="status">
+    [WAITING FOR BIOMETRIC CLEARANCE SIGNAL...]
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const highTemp = params.get("high") || "14 degrees";
+    const lowTemp = params.get("low") || "8 degrees";
+    const leaveWeather = params.get("leave") || "10 degrees with lingering showers";
+
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+    const days = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+    const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+    
+    document.getElementById("time-box").textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    document.getElementById("date-box").textContent = `${days[dayOfWeek]} // ${months[now.getMonth()]} ${String(now.getDate()).padStart(2, '0')}`;
+
+    // Term & Holiday Check for Rugby School Japan
+    function isSchoolInTerm() {
+      const timeMs = now.getTime();
+      const autumnEnd = new Date(2026, 11, 9).getTime(); // Dec 9, 2026
+      const springStart = new Date(2027, 0, 6).getTime();
+      const springHalfStart = new Date(2027, 1, 13).getTime();
+      const springHalfEnd = new Date(2027, 1, 22).getTime();
+      const springEnd = new Date(2027, 2, 25).getTime();
+      const summerStart = new Date(2027, 3, 13).getTime();
+      const summerEnd = new Date(2027, 5, 27).getTime();
+
+      if (timeMs >= autumnEnd && timeMs < springStart) return false;
+      if (timeMs >= springHalfStart && timeMs < springHalfEnd) return false;
+      if (timeMs >= springEnd && timeMs < summerStart) return false;
+      if (timeMs >= summerEnd) return false;
+      return true;
+    }
+
+    const inTerm = isSchoolInTerm();
+
+    // Smart Leave Time Logic: Wed(3) & Fri(5) = 6:30; Mon, Tue, Thu, Sat = 7:30; Sun/Holiday = None
+    function getScheduledLeaveTime() {
+      if (params.get("leavetime")) return params.get("leavetime");
+      if (!inTerm || dayOfWeek === 0) return null;
+      if (dayOfWeek === 3 || dayOfWeek === 5) return "6:30";
+      return "7:30";
+    }
+
+    const leaveTime = getScheduledLeaveTime();
+    document.getElementById("leave-badge").textContent = leaveTime ? `LEAVE: ${leaveTime}` : "NO DEPARTURE";
+
+    // Hardcoded Timetables (Week A & Week B - Assignments Ignored)
+    const timetables = {
+      "B": {
+        1: [
+          { time: "08:30", title: "Tutor Time (Quad 206)" },
+          { time: "08:55", title: "Physics (Physics Lab 2)" },
+          { time: "09:45", title: "Chemistry (Chemistry Lab)" },
+          { time: "10:55", title: "Chemistry (Chemistry Lab)" },
+          { time: "11:45", title: "Biology (Biology Lab 3)" },
+          { time: "13:55", title: "English (Forest 203)" },
+          { time: "14:45", title: "English (Forest 203)" },
+          { time: "15:55", title: "Design (Physics Lab 4)" }
+        ],
+        2: [
+          { time: "08:30", title: "Whole School Singing" },
+          { time: "08:55", title: "Physics (Physics Lab 2)" },
+          { time: "09:45", title: "Physics (Physics Lab 2)" },
+          { time: "10:55", title: "PSHE (Field 101)" },
+          { time: "11:45", title: "Biology (Biology Lab 3)" },
+          { time: "13:55", title: "Computer Science (CAD room 1)" },
+          { time: "14:45", title: "Maths (Quad 206)" },
+          { time: "15:55", title: "English (Forest 203)" }
+        ],
+        3: [
+          { time: "07:00", title: "Swimming (7 - 8am)" },
+          { time: "08:30", title: "Whole School Assembly" },
+          { time: "08:55", title: "Japanese (Forest 202)" },
+          { time: "09:45", title: "Chemistry (Chemistry Lab)" },
+          { time: "10:55", title: "Computer Science (CAD room 2)" },
+          { time: "11:45", title: "Computer Science (CAD room 2)" },
+          { time: "13:55", title: "Maths (Quad 206)" },
+          { time: "14:45", title: "English (Forest 203)" },
+          { time: "15:55", title: "Geography (Quad 303)" }
+        ],
+        4: [
+          { time: "08:30", title: "Tutor Time (Quad 206)" },
+          { time: "08:55", title: "PSHE (Field 101)" },
+          { time: "09:45", title: "Chemistry (Chemistry Lab)" },
+          { time: "10:55", title: "Design (Physics Lab)" },
+          { time: "11:45", title: "Maths (Quad 206)" },
+          { time: "13:55", title: "Sport (1:55 - 2:40pm)" },
+          { time: "14:45", title: "Sport (2:45 - 3:30pm)" },
+          { time: "15:55", title: "Biology (Biology Lab 3)" }
+        ],
+        5: [
+          { time: "07:00", title: "Swimming (7 - 8am)" },
+          { time: "08:30", title: "Tutor Time (Quad 206)" },
+          { time: "08:55", title: "Maths (Quad 206)" },
+          { time: "09:45", title: "Physics (Physics Lab 2)" },
+          { time: "10:55", title: "Computer Science (CAD room 2)" },
+          { time: "11:45", title: "Geography (Quad 303)" },
+          { time: "13:55", title: "Chemistry (Chemistry Lab)" },
+          { time: "14:45", title: "Japanese (Forest 202)" },
+          { time: "15:55", title: "Japanese (Forest 202)" }
+        ]
+      },
+      "A": {
+        1: [
+          { time: "08:30", title: "Tutor Time (Quad 206)" },
+          { time: "08:55", title: "Design (DT Workshop)" },
+          { time: "09:45", title: "Design (DT Workshop)" },
+          { time: "10:55", title: "Geography (Quad 303)" },
+          { time: "11:45", title: "Geography (Quad 303)" },
+          { time: "13:55", title: "Physics (Physics Lab 2)" },
+          { time: "14:45", title: "Biology (Biology Lab 3)" },
+          { time: "15:55", title: "Chemistry (Chemistry Lab)" }
+        ],
+        2: [
+          { time: "08:30", title: "Whole School Singing" },
+          { time: "08:55", title: "Biology (Biology Lab 3)" },
+          { time: "09:45", title: "Biology (Biology Lab 3)" },
+          { time: "10:55", title: "Physics (Physics Lab)" },
+          { time: "11:45", title: "Design (Physics Lab)" },
+          { time: "13:55", title: "Japanese (Forest 202)" },
+          { time: "14:45", title: "Maths (Quad 206)" },
+          { time: "15:55", title: "Chemistry (Chemistry Lab)" }
+        ],
+        3: [
+          { time: "08:30", title: "Whole School Assembly" },
+          { time: "08:55", title: "English (Forest 203)" },
+          { time: "09:45", title: "English (Forest 203)" },
+          { time: "10:55", title: "Geography (Quad 303)" },
+          { time: "11:45", title: "Biology (Biology Lab 3)" },
+          { time: "13:55", title: "Physics (Physics Lab 2)" },
+          { time: "14:45", title: "Computer Science (CAD room 2)" },
+          { time: "15:55", title: "Computer Science (CAD room 2)" }
+        ],
+        4: [
+          { time: "08:30", title: "Tutor Time (Quad 206)" },
+          { time: "08:55", title: "Design (DT Workshop)" },
+          { time: "09:45", title: "Design (DT Workshop)" },
+          { time: "10:55", title: "Maths (Quad 206)" },
+          { time: "11:45", title: "Maths (Quad 206)" },
+          { time: "13:55", title: "Sport (1:55 - 2:40pm)" },
+          { time: "14:45", title: "Sport (2:45 - 3:30pm)" },
+          { time: "15:55", title: "Japanese (Forest 202)" }
+        ],
+        5: [
+          { time: "07:00", title: "Swimming (7 - 8am)" },
+          { time: "08:30", title: "Tutor Time (Quad 206)" },
+          { time: "08:55", title: "Japanese (Forest 202)" },
+          { time: "09:45", title: "Japanese (Forest 202)" },
+          { time: "10:55", title: "Geography (Quad 303)" },
+          { time: "11:45", title: "Geography (Quad 303)" },
+          { time: "13:55", title: "English (Forest 203)" },
+          { time: "14:45", title: "English (Forest 203)" },
+          { time: "15:55", title: "Computer Science (CAD room 2)" }
+        ]
+      }
+    };
+
+    // Automatic Week A/B Calculation anchored to Monday Nov 16, 2026 = Week B
+    function getActiveWeek() {
+      const anchorMonday = new Date(2026, 10, 16);
+      const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const diffDays = Math.floor((todayMidnight - anchorMonday) / (1000 * 60 * 60 * 24));
+      const weeksPassed = Math.floor(diffDays / 7);
+      return Math.abs(weeksPassed) % 2 === 0 ? "B" : "A";
+    }
+
+    const currentWeek = getActiveWeek();
+    document.getElementById("sub-protocol").textContent = inTerm ? `STARK PROTOCOL // WEEK ${currentWeek}` : `STARK PROTOCOL // HOLIDAY`;
+    document.getElementById("sched-title").textContent = inTerm ? `TODAY'S TIMETABLE [WEEK ${currentWeek}]` : `TIMETABLE SUSPENDED`;
+
+    const listEl = document.getElementById("eventList");
+    const todaysEvents = (inTerm && dayOfWeek >= 1 && dayOfWeek <= 5) ? timetables[currentWeek][dayOfWeek] : [];
+
+    if (todaysEvents.length === 0) {
+      listEl.innerHTML = `<li class="event-item"><span class="event-title">No scheduled classes today (Holiday or Weekend), Sir.</span></li>`;
+    } else {
+      listEl.innerHTML = todaysEvents.map(ev => `
+        <li class="event-item">
+          <span class="event-time">${ev.time}</span>
+          <span class="event-title">${ev.title}</span>
+        </li>
+      `).join("");
+    }
+
+    // Alarm Sound Oscillator
+    let audioCtx = null;
+    let alarmInterval = null;
+    let alarmPlaying = false;
+
+    function startAlarmSound() {
+      if (alarmPlaying) return;
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      alarmPlaying = true;
+
+      alarmInterval = setInterval(() => {
+        if (!alarmPlaying) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(659.25, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.25);
+      }, 450);
+    }
+
+    function stopAlarmSound() {
+      alarmPlaying = false;
+      clearInterval(alarmInterval);
+      if (audioCtx) audioCtx.close();
+    }
+
+    window.addEventListener("load", () => {
+      try { startAlarmSound(); } catch (e) {}
+    });
+
+    // 3-Second Hold Logic
+    const holdBtn = document.getElementById("holdBtn");
+    const ring = document.getElementById("ring");
+    const statusText = document.getElementById("status");
+    const circumference = 376.99;
+    const holdDuration = 3000;
+
+    let holdStart = null;
+    let animFrame = null;
+    let dismissed = false;
+
+    function startHold(e) {
+      e.preventDefault();
+      if (dismissed) return;
+      if (!alarmPlaying) startAlarmSound();
+      holdStart = performance.now();
+      animFrame = requestAnimationFrame(updateProgress);
+    }
+
+    function updateProgress(timestamp) {
+      const elapsed = timestamp - holdStart;
+      const progress = Math.min(elapsed / holdDuration, 1);
+      ring.style.strokeDashoffset = circumference * (1 - progress);
+
+      if (progress >= 1) {
+        dismissAlarm();
+      } else {
+        animFrame = requestAnimationFrame(updateProgress);
+      }
+    }
+
+    function cancelHold() {
+      if (dismissed) return;
+      cancelAnimationFrame(animFrame);
+      ring.style.strokeDashoffset = circumference;
+    }
+
+    holdBtn.addEventListener("touchstart", startHold);
+    holdBtn.addEventListener("mousedown", startHold);
+    holdBtn.addEventListener("touchend", cancelHold);
+    holdBtn.addEventListener("mouseup", cancelHold);
+    holdBtn.addEventListener("mouseleave", cancelHold);
+
+    // Natural British Voice Synthesis
+    function speakBriefing(text) {
+      if (!('speechSynthesis' in window)) return;
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.96; 
+      utterance.pitch = 0.92; 
+
+      const voices = window.speechSynthesis.getVoices();
+      const britishVoice = voices.find(v => v.lang === 'en-GB' && (v.name.includes('Daniel') || v.name.includes('Oliver') || v.name.includes('British') || v.name.includes('UK')));
+      if (britishVoice) {
+        utterance.voice = britishVoice;
+      }
+      window.speechSynthesis.speak(utterance);
+    }
+
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
+    }
+
+    function dismissAlarm() {
+      dismissed = true;
+      stopAlarmSound();
+      holdBtn.innerHTML = "DISENGAGED";
+      holdBtn.style.color = "#00ffcc";
+      holdBtn.style.borderColor = "#00ffcc";
+
+      // Exact Script Requested with Tuesday Late School Reminder & Conditional Leave Logic
+      const currentTimeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      
+      let script = `Good morning Sir, The current time is ${currentTimeStr}, The weather today will be a high of ${highTemp} and a low of ${lowTemp}. `;
+      
+      // Tuesday Late School Reminder Rule
+      if (dayOfWeek === 2) {
+        script += `Remember, you're staying late at school tonight, Sir. `;
+      }
+
+      if (leaveTime) {
+        script += `The time by you leave the weather should be ${leaveWeather} and please sir, try to leave by ${leaveTime} we dont want another arguement, `;
+      }
+      
+      script += `hope you enjoy your day today sir, wishing you the best`;
+
+      statusText.textContent = `> ${script}`;
+      speakBriefing(script);
+    }
+  </script>
+</body>
+</html>
